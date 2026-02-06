@@ -1,7 +1,7 @@
-# VeriCert Protocol
+# zk-VeriCert
 ## Overview
 
-**VeriCert Protocol** explores the integration of **Self-Sovereign Identity (SSI)** principles into the **Public Key Infrastructure (PKI)** to enhance security, transparency, and privacy in digital identity management.
+**zk-VeriCert** explores the integration of **Self-Sovereign Identity (SSI)** principles into the **Public Key Infrastructure (PKI)** to enhance security, transparency, and privacy in digital identity management.
 
 The protocol combines:
 - **Decentralized Identifiers (DIDs)**
