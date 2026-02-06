@@ -1,47 +1,135 @@
-Comandi da eseguire - Architettura
+# 🧱 Zero-Knowledge Proof Setup — DidProofKeccak  
+Questo documento contiene i comandi necessari per compilare il circuito Circom, generare le chiavi di proving/verification e gestire le operazioni lato server (prover) e lato client (verifier).
 
-#Compilare circuito
-circom DidProofKeccak.circom --r1cs --wasm --sym --c -l ..\node_modules\
-#info about the circuit
+---
+
+## 📌 1. Compilazione del Circuito
+
+```bash
+# Compilare il circuito
+circom DidProofKeccak.circom --r1cs --wasm --sym --c -l ../node_modules/
+
+# Informazioni sul circuito
 snarkjs r1cs info DidProofKeccak.r1cs
-# Powers of Tau
+```
+
+---
+
+## ⚡ 2. Powers of Tau Ceremony
+
+```bash
+# Inizializzazione Powers of Tau
 snarkjs powersoftau new bn128 19 pot19_0000.ptau -v
+
+# Prima contribuzione
 snarkjs powersoftau contribute pot19_0000.ptau pot19_0001.ptau --name="First contribution" -v
+
+# Preparazione phase 2
 snarkjs powersoftau prepare phase2 pot19_0001.ptau pot19_final.ptau -v
-#Verify Powersoftau
-snarkjs powersoftau verify .\pot19_final.ptau
 
-#Create proving and verification key
+# Verifica Powers of Tau
+snarkjs powersoftau verify ./pot19_final.ptau
+```
+
+---
+
+## 🔑 3. Generazione delle Chiavi di Prova e Verifica
+
+```bash
+# Generazione proving e verification key
 snarkjs groth16 setup DidProofKeccak.r1cs pot19_final.ptau DidProofKeccak_0000.zkey
+
+# Contribuzione zkey
 snarkjs zkey contribute DidProofKeccak_0000.zkey DidProofKeccak_0001.zkey --name="root contribution" -v
+
+# Final Beacon
 snarkjs zkey beacon DidProofKeccak_0001.zkey circuit_final.zkey 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon phase2"
-                        #Export verification key
+
+# Esportazione verification key
 snarkjs zkey export verificationkey DidProofKeccak_0001.zkey verification_key.json
+```
 
+---
 
-#Verify the final zkey
+## ✔️ 4. Verifica della ZKey Finale
+
+```bash
 snarkjs zkey verify DidProofKeccak.r1cs pot19_final.ptau circuit_final.zkey
+```
 
-#generate the Solidity code
+---
+
+## 🧩 5. Generazione del Solidity Verifier
+
+```bash
 snarkjs zkey export solidityverifier circuit_final.zkey verifier.sol
+```
 
+---
 
-#COMANDI SERVER (PROVER)
-Retrieve:  DidProofKeccak.wasm, circuit_final.zkey verification_key.json
-Optional:  DidProofKeccak.r1cs, DidProofKeccak.sym, pot12_final.ptau
+# 🖥️ COMANDI SERVER (PROVER)
 
-create input.json data SSIOp.getDNSTXTSecret
-#compute witness
+### File richiesti:
+- DidProofKeccak.wasm
+- circuit_final.zkey
+- verification_key.json
+
+### Opzionali:
+- DidProofKeccak.r1cs
+- DidProofKeccak.sym
+- pot19_final.ptau
+
+---
+
+## 📝 1. Creazione Input  
+Generare `input.json` dai dati applicativi (es. SSIOp.getDNSTXTSecret).
+
+---
+
+## 🧮 2. Calcolo del Witness
+
+```bash
 node generate_witness.js DidProofKeccak.wasm input.json witness.wtns
-#Generating a Proof
+```
+
+---
+
+## 🛠️ 3. Generazione della Proof
+
+```bash
 snarkjs groth16 prove circuit_final.zkey witness.wtns proof.json public.json
-#Verifying a Proof
-snarkjs groth16 verify verification_key.json public.json proof.json
+```
 
+---
 
-#COMANDI CLIENT (VERIFIER)
-Retrieve:  verification_key.json,
-#Local verification
+## 🔍 4. Verifica della Proof (Server)
+
+```bash
 snarkjs groth16 verify verification_key.json public.json proof.json
-#On-chain verification (generate the parameters of the call)
+```
+
+---
+
+# 📲 COMANDI CLIENT (VERIFIER)
+
+Recuperare:
+
+- verification_key.json
+
+---
+
+## 🔐 Verifica Locale
+
+```bash
+snarkjs groth16 verify verification_key.json public.json proof.json
+```
+
+---
+
+## ⛓️ Verifica On‑Chain
+
+```bash
 snarkjs generatecall
+```
+
+---
