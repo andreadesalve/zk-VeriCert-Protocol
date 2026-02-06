@@ -78,11 +78,11 @@ This project is intended for local experimentation and performance evaluation.
 Open two separate terminals.
   - Terminal 1 – Server:
     ```bash
-    node ./scr/appServer.js VP
+    node ./scr/appServerZK.js VP
     ```
   - Terminal 2 – Client:
     ```bash
-    node ./scr/appClient.js VP
+    node ./scr/appClientZK.js VP
     ```
 The scripts simulate VP exchange during the TLS handshake and store performance metrics in CSV format.
 
@@ -95,22 +95,7 @@ The following metrics are collected:
 - Communication delay
 Results are saved as CSV files for offline analysis.
 
-## Use Cases
-- Research on SSI–PKI integration
-- Academic experiments on decentralized identity
-- Performance benchmarking of VC/VP systems
-- Certificate Transparency via blockchain
-- Secure digital identity management
 
-## Limitations & Future Work
-Currently tested only in a local Ganache environment
-- Not optimized for production-scale deployments
-- No formal security proofs included
-- Future work may include:
-  - Deployment on public Ethereum networks
-  - Advanced credential revocation mechanisms
-  - Hardware-backed key management
-  - Formal security and performance analysis
 
 ## License
 This project is licensed under the MIT License.
