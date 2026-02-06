@@ -41,7 +41,9 @@ var fs = require("fs/promises");
 var config = require('../config.json');
 var contractInstance;
 function getResolver() {
+
     function resolve(did) {
+     console.log("Resolve did: "+ typeof did)
         return __awaiter(this, void 0, void 0, function () {
             var err, startTime, tx, resolutionTime, csvRow, DID, ethrAccount, didDocumentMetadata, didDocument, docIdMatchesDid, contentType;
             return __generator(this, function (_a) {
@@ -53,9 +55,16 @@ function getResolver() {
                     case 1:
                         tx = _a.sent();
                         resolutionTime = parseFloat((performance.now() - startTime).toFixed(2));
-                        csvRow = "".concat(resolutionTime, "\n");
+                        let gas;
+                        (async () => {
+                            const gasEstimate = await contractInstance.estimateGas.resolutionDID(did.split(":")[3]);
+                            console.log("Estimated gas "+did+" : ", gasEstimate.toString());
+                            gas=gasEstimate.toString()
+                        })().catch(console.error);
+                        contractInstance.resolutionDID(did.split(":")[3])
+                        csvRow = "".concat(resolutionTime+","+gas, "\n");
                         fs.appendFile(config.perfFiles.DIDresolutionPerf, csvRow);
-                        DID = "did:ethr:".concat(config.sepolia.net, ":").concat(tx[0]);
+                        DID = "did:ethr:".concat(config.ganache.net, ":").concat(tx[0]);
                         ethrAccount = tx[1];
                         didDocumentMetadata = {};
                         didDocument = null;

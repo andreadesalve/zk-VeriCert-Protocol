@@ -34,6 +34,45 @@ function createVPayload(DIDObj, X509CertChain, commName) {
     return VPayload
 }
 
+function createVPayload(DIDObj, X509CertChain, commName, zkProof, publicSignals, V) {
+    const VPayload = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiablePresentation'],
+        sub: DIDObj.did,
+        vc: {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential'],
+            credentialSubject: {
+                id: commName,
+                TLSCertChain: X509CertChain.toString(),
+                proof: JSON.stringify(zkProof),
+                publicSignals: JSON.stringify(publicSignals),
+                v: V.toString()
+            }
+        }
+    }
+    return VPayload
+}
+
+
+function createVPayload(DIDObj, X509CertChain, commName, V) {
+    const VPayload = {
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiablePresentation'],
+        sub: DIDObj.did,
+        vc: {
+            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            type: ['VerifiableCredential'],
+            credentialSubject: {
+                id: commName,
+                TLSCertChain: X509CertChain.toString(),
+                v: V.toString()
+            }
+        }
+    }
+    return VPayload
+}
+
 async function verifyPresentationJwtES256Perf(token) {
   return new Promise(async (resolve, reject) => {
     try {

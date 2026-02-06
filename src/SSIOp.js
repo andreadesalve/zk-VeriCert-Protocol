@@ -16,11 +16,15 @@ const contractABI = require("../build/contracts/SSLBlockchainReg.json").abi
 const hdkey = require('hdkey')
 const bip39 = require('bip39')
 const fs = require('fs').promises
+const fss = require("fs");
 const fsConst = require('fs').constants
 const crypto = require('crypto')
 const { keccak256 } = require('ethereumjs-util')
-const { exec } = require('child_process')
+const { exec, execSync } = require('child_process')
 const { Network, Alchemy, Utils, Contract, Wallet } = require('alchemy-sdk')
+const snarkjs=require("snarkjs");
+
+const S_BYTES = 64, DID_BYTES = 64;
 
 let contract = null
 let provider = null
@@ -65,7 +69,7 @@ async function initSepolia() {
     try {
         //Setup provider
         const settings = {
-            apiKey: "",
+            apiKey: "c3Cv3lTUbPafXjv0r-0FChOaeUwR_31E",
             network: Network.ETH_SEPOLIA,
         };
 
@@ -132,21 +136,21 @@ function getProviderInstance() {
 async function createDID(mainWallet, revkWallet) {
     
     const id = mainWallet._signingKey().compressedPublicKey
-    const did = `did:ethr:${config.sepolia.net}:${id}`
+    const did = `did:ethr:${config.ganache.net}:${id}`
     return new DIDSubject(did, id, mainWallet, revkWallet)
 }
 
 async function newEntry(DIDObj, secretHash) {
     try {
         const startTime = performance.now();
-        const tx = await contract.connect(DIDObj.wallet).newDID(DIDObj.identifier, secretHash, DIDObj.revkWallet.address)
+        const tx = await contract.connect(DIDObj.wallet).newDID(DIDObj.identifier, secretHash, DIDObj.revkWallet.address,{gasLimit: 5000000, gasPrice: 891674327})
         const receipt = await tx.wait()
         const newEntryTime = parseFloat((performance.now() - startTime).toFixed(2))
 
         const cost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice))
-        const csvRow = `${newEntryTime},${cost}\n`
+        const csvRow = `${newEntryTime},${receipt.gasUsed},${newEntryTime}\n`
         fs.appendFile(config.perfFiles.newEntryPerf, csvRow)
-
+        console.log("New entry: "+DIDObj.identifier)
     } catch (error) {
         console.log("Error:", error);
     }
@@ -157,7 +161,83 @@ async function newEntry(DIDObj, secretHash) {
  *1. CERT --> it updates only the certificate hash value in the registry
  *2. RA_SIGNATURE --> it updates only the RA signature in the registry
 */
-async function updateEntry(command, DIDObj, certHash, dsRA) {
+async function updateEntry(command, DIDObj, certHash, dsZK, publicSignals) {
+    try {
+        switch (command) {
+            case 'CERT':
+                if(certHash.length > 1) {
+                    const startTime = performance.now();
+                    const tx = await contract.connect(DIDObj.wallet).updateEntry(DIDObj.identifier, certHash,[],[])
+                    const receipt = await tx.wait()
+                    const updTime = parseFloat((performance.now() - startTime).toFixed(2))
+
+                    const cost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice))
+                    const csvRow = `${"CERTIFICATE"},${updTime},${receipt.gasUsed}\n`
+                    fs.appendFile(config.perfFiles.updEntryPerf, csvRow)
+                    break;
+                }
+                throw new Error('CERT command without certificate hash value')
+            case 'ZK_SIGNATURE':
+                if(dsZK.length > 1 && publicSignals.length>1) {
+                    const startTime = performance.now();
+                    const tx = await contract.connect(DIDObj.wallet).updateEntry(DIDObj.identifier, [], dsZK,publicSignals)
+                    const receipt = await tx.wait()
+                    const updTime = parseFloat((performance.now() - startTime).toFixed(2))
+
+                    const cost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice))
+                    const csvRow = `${"ZK_SIGNATURE"},${updTime},${receipt.gasUsed}\n`
+                    fs.appendFile(config.perfFiles.updEntryPerf, csvRow)
+                    break;
+                }
+                console.log("dsZK:"+dsZK)
+                console.log("publicSignals:"+publicSignals)
+                throw new Error('ZK_SIGNATURE command without signature value')
+            default:
+                throw new Error('Invalid command')
+        }
+    } catch (error) {
+        console.log("Error:", error)
+    }
+}
+
+
+async function updateZk(DIDObj, cid1, cid2,  cid3) {
+    try {
+                    let startTime = performance.now();
+                    const tx = await contract.connect(DIDObj).setZkCircuitFiles(Buffer.from(cid1, 'utf8'),Buffer.from(cid2, 'utf8'), Buffer.from(cid3, 'utf8'))
+                    const receipt = await tx.wait()
+                    let updTime = parseFloat((performance.now() - startTime).toFixed(2))
+
+
+                    const csvRow = `${"setZkCircuitFiles"},${updTime},${receipt.gasUsed}\n`
+                    console.log("Gas used to update ZK artifact: "+csvRow)
+//                    fs.appendFile(config.perfFiles.updEntryPerf, csvRow)
+
+                    const populated = await contract.populateTransaction.getZkCircuitFiles();
+                    // Send and wait
+
+                    const tx2 = await DIDObj.sendTransaction({ to: contract.address, ...populated });
+                    const receipt2 = await tx2.wait();
+
+                    startTime = performance.now();
+                    const txR = await contract.connect(DIDObj).getZkCircuitFiles()
+                   updTime = parseFloat((performance.now() - startTime).toFixed(2))
+                   const csvRow2 = `${"getZkCircuitFiles"},${updTime},${receipt2.gasUsed}\n`
+                      console.log("Gas used to get ZK artifact: "+csvRow2)
+
+                    //console.log(txR)
+                    console.log(ethers.utils.toUtf8String(txR[0]))
+
+    } catch (error) {
+        console.log("Error:", error)
+    }
+}
+
+/*Function to update registry entry in multiple conditions, represented by command value:
+ *1. CERT --> it updates only the certificate hash value in the registry
+ *2. RA_SIGNATURE --> it updates only the RA signature in the registry
+
+async function updateEntry(command, DIDObj, certHash) {
     try {
         switch (command) {
             case 'CERT':
@@ -166,33 +246,20 @@ async function updateEntry(command, DIDObj, certHash, dsRA) {
                     const tx = await contract.connect(DIDObj.wallet).updateEntry(DIDObj.identifier, certHash, [])
                     const receipt = await tx.wait()
                     const updTime = parseFloat((performance.now() - startTime).toFixed(2))
-
+                    //console.log("Receipt: "+JSON.stringify(receipt));
                     const cost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice))
-                    const csvRow = `${"CERTIFICATE"},${updTime},${cost}\n`
+                    const csvRow = `${"CERTIFICATE"},${updTime},${receipt.gasUsed}\n`
                     fs.appendFile(config.perfFiles.updEntryPerf, csvRow)
                     break;
                 }
                 throw new Error('CERT command without certificate hash value')
-            case 'RA_SIGNATURE':
-                if(dsRA.length > 1) {
-                    const startTime = performance.now();
-                    const tx = await contract.connect(DIDObj.wallet).updateEntry(DIDObj.identifier, [], dsRA)
-                    const receipt = await tx.wait()
-                    const updTime = parseFloat((performance.now() - startTime).toFixed(2))
-
-                    const cost = ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice))
-                    const csvRow = `${"RA_SIGNATURE"},${updTime},${cost}\n`
-                    fs.appendFile(config.perfFiles.updEntryPerf, csvRow)
-                    break;
-                }
-                throw new Error('RA_SIGNATURE command without signature value')
             default:
                 throw new Error('Invalid command')
         }
     } catch (error) {
         console.log("Error:", error)
     }
-}
+}*/
 
 async function revokeDID(DIDObj, oldSecret) {
     try {
@@ -224,7 +291,7 @@ function requestSignatureRA(commName, DIDObj) {
 async function crtVerify() {
 
     return new Promise((resolve, reject) => {
-        const opensslCommand = `openssl verify -CAfile ./certChain.pem ./certServer.pem`;
+        const opensslCommand = '"C:\\Program Files\\OpenSSL-Win64\\bin\\openssl.exe" verify -CAfile ./cacert.pem ./certServer.pem';
         exec(opensslCommand, async (error, stdout, stderr) => {
             if (stderr) {
                 console.log(stderr)
@@ -274,6 +341,100 @@ async function getSecret(path) {
     });
 }
 
+function getDNSTXTSecret(secret,did) {
+    const sBytes = toFixedUtf8Bytes(secret, S_BYTES);
+    const didBytes = toFixedUtf8Bytes(did, DID_BYTES);
+    // Concatena
+    const packed = ethers.utils.concat([sBytes, didBytes]);
+    // Calcola Keccak256
+    const Vhex = ethers.utils.keccak256(packed);
+    //console.log("DID:", did);
+    //console.log("Secret:", secret);
+    //console.log("V =", V);
+    return Vhex;
+}
+
+function generateWitness(secret,did,Vhex){
+       const sBytes = toFixedUtf8Bytes(secret, S_BYTES);
+       const didBytes = toFixedUtf8Bytes(did, DID_BYTES);
+       const input = {
+             S: Array.from(sBytes),
+             DID: Array.from(didBytes),
+             V: hexToBitsLSBperByte(Vhex)
+           };
+
+       fss.writeFileSync("./serverData/input.json", JSON.stringify(input, null, 2));
+       //console.log(" input.json created.");
+       execSync("node ./serverData/generate_witness.js ./serverData/DidProofKeccak.wasm ./serverData/input.json ./serverData/witness.wtns");
+       //console.log("Witness created.");
+}
+
+async function generateZKProof(zkeyCircuitFile,wtnessFile){
+    const proof = await snarkjs.groth16.prove(
+    zkeyCircuitFile, //"circuit_final.zkey",
+    wtnessFile, //"witness.wtns"
+  );
+  //fss.writeFileSync("./serverData/proof.json", JSON.stringify(proof.proof));
+  //fss.writeFileSync("./serverData/public.json", JSON.stringify(proof.publicSignals));
+  return proof;
+}
+
+
+async function verifyZKProofLocally(vkey,did,V,proof,publicSignals) {
+  //const publicSignals = JSON.parse(fs.readFileSync("public.json"));
+  //const sBytes = toFixedUtf8Bytes(secret, S_BYTES);
+  //const didBytes = toFixedUtf8Bytes(did, DID_BYTES);
+  //const publicSignals = {
+  //  DID: Array.from(didBytes),
+  //  V: hexToBitsLSBperByte(Vhex)
+  //};
+  console.log("Veirfy zk proof")
+  const res = await snarkjs.groth16.verify(vkey, publicSignals, proof);
+  return res;
+}
+
+
+async function verifyZKProofOnchain(verificationKeyFile,did,V,proof,publicSignals) {
+  const vKey = JSON.parse(fs.readFileSync(verificationKeyFile));
+  //const publicSignals = JSON.parse(fs.readFileSync("public.json"));
+  //const sBytes = toFixedUtf8Bytes(secret, S_BYTES);
+  //const didBytes = toFixedUtf8Bytes(did, DID_BYTES);
+  //const publicSignals = {
+  //  DID: Array.from(didBytes),
+  //  V: hexToBitsLSBperByte(Vhex)
+  //};
+  const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+  let argv = calldata.replace(/["[\]\s]/g, "").split(',').map(x => BigInt(x).toString());
+  const a = [argv[0], argv[1]];
+  const b = [[argv[2], argv[3]], [argv[4], argv[5]]];
+  const c = [argv[6], argv[7]];
+  const input = argv.slice(8);  // public signals
+
+
+  const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+  //console.log("Valid proof? ", res);
+  return res;
+}
+
+
+function toFixedUtf8Bytes(str, fixedLen) {
+  const bytes = ethers.utils.toUtf8Bytes(str);
+  if (bytes.length > fixedLen) return bytes.slice(0, fixedLen);
+  const out = new Uint8Array(fixedLen); out.set(bytes); return out;
+}
+
+function hexToBitsLSBperByte(hex) {
+  const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const bytes = ethers.utils.arrayify("0x"+h);
+  const bits = [];
+  for (const by of bytes) {
+    for (let i = 0; i < 8; i++) {
+      bits.push((by >> i) & 1); // LSB-first per byte
+    }
+  }
+  return bits; // 256 bit
+}
+
 
 /* 
  * ---------------------------------------------
@@ -315,6 +476,12 @@ module.exports = {
     getWallet,
     writePerf,
     getRApubKey,
+    getDNSTXTSecret,
+    generateWitness,
+    generateZKProof,
+    verifyZKProofLocally,
+    verifyZKProofOnchain,
     getContractInstance,
+    updateZk,
     getProviderInstance
 }
