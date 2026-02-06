@@ -1,15 +1,27 @@
 // SPDX-License-Identifier: MIT 
 pragma solidity >=0.4.22 <0.9.0;
 
+//import "./Groth16Verifier.sol";
+
 contract SSLBlockchainReg {
     struct Entry {
         address ethAddr;
         bytes id;
         bytes secretHash;
         bytes certHash;
-        bytes dsRA;
+        bytes dsZK;
+        bytes publicSignals;
         address revkAddr;
     }
+
+    //Groth16Verifier public verifier = new Groth16Verifier();
+    address public owner;
+
+    bytes public circuitWasmCID;
+    bytes public provingKeyCID;
+    bytes public verificationKeyCID;
+
+
 
     mapping (bytes => Entry) public registry;
     mapping (address => bool) private isValueExist_Addr;
@@ -21,15 +33,30 @@ contract SSLBlockchainReg {
         bytes newCertHash
     );
 
-    event updDsRA(
+    event updDsZK(
         bytes identity,
-        bytes newDsRA
+        bytes newZkProof
     );
 
     event rvkDID(
         address ethAddr,
         bytes identity
     );
+
+    event zkCircuitUpdated(
+        bytes wasmCID,
+        bytes zkeyCID,
+        bytes vkeyCID
+    );
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "NOT AUTHORIZED");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     function newDID(bytes memory identity, bytes memory secretHash, address revkAddr) public{
         require(!isValueExist_Addr[msg.sender], "ADDRESS ALREADY REGISTERED");
@@ -42,7 +69,7 @@ contract SSLBlockchainReg {
         isValueExist_Addr[revkAddr] = true;
         isValueExist_Secret[secretHash] = true;
 
-        Entry memory entry = Entry(msg.sender, identity, secretHash, hex"00", hex"00", revkAddr);
+        Entry memory entry = Entry(msg.sender, identity, secretHash, hex"00", hex"00", hex"00", revkAddr);
         registry[identity] = entry;
     }
 
@@ -53,23 +80,30 @@ contract SSLBlockchainReg {
     }
 
     //If the event returns registry[identity].id 0x0 means a revoked did
-    function infoCT(bytes memory identity) public view returns(bytes memory, bytes memory){
+    function infoCT(bytes memory identity) public view returns(bytes memory){
         require(isValueExist_ID[identity], "UNREGISTERED IDENTITY");
-        return(registry[identity].certHash, registry[identity].dsRA);
+        return registry[identity].certHash;
+    }
+
+    function getDproof(bytes memory identity) public view returns (bytes memory, bytes memory)
+    {
+        require(isValueExist_ID[identity], "UNREGISTERED IDENTITY");
+        return(registry[identity].dsZK, registry[identity].publicSignals);
     }
 
     //It can be called to update both certificate hash and dsRA or only one of these two values at time.
-    function updateEntry(bytes memory identity, bytes memory newCertHash, bytes memory newDsRA) public {
+    function updateEntry(bytes memory identity, bytes memory newCertHash, bytes memory newdsZK, bytes memory newpublicSignals ) public {
         require(msg.sender == registry[identity].ethAddr, "NO ACCESS RIGHT");
     
         if(bytes(newCertHash).length > 0) {
             registry[identity].certHash = newCertHash;
             emit updCertHash(identity, registry[identity].certHash);
         }
-        
-        if(bytes(newDsRA).length > 0) {
-            registry[identity].dsRA = newDsRA;
-            emit updDsRA(identity, registry[identity].dsRA);
+
+        if(bytes(newdsZK).length > 0 && bytes(newpublicSignals).length > 0) {
+            registry[identity].dsZK = newdsZK;
+            registry[identity].publicSignals = newpublicSignals;
+            emit updDsZK(identity, registry[identity].dsZK);
         }
     }
 
@@ -82,4 +116,20 @@ contract SSLBlockchainReg {
 
         emit rvkDID(msg.sender, identity);
     }
+
+
+    function setZkCircuitFiles(bytes memory wasmCID, bytes memory zkeyCID, bytes memory vkeyCID) public onlyOwner {
+        circuitWasmCID = wasmCID;
+        provingKeyCID = zkeyCID;
+        verificationKeyCID = vkeyCID;
+        emit zkCircuitUpdated(wasmCID, zkeyCID, vkeyCID);
+    }
+
+
+    function getZkCircuitFiles() public view returns (bytes memory, bytes memory, bytes memory)
+    {
+        return (circuitWasmCID, provingKeyCID, verificationKeyCID);
+    }
+
+
 }
