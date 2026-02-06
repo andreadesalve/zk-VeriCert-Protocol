@@ -5,6 +5,7 @@
 
 The protocol combines:
 - **Decentralized Identifiers (DIDs)**
+- **Zero-Knowledge Proof**
 - **Smart Contracts**
 - **Blockchain Technology**
 
