@@ -1,15 +1,15 @@
 {
     "ganache" : {
         "net": "0x539",
-        "registry": "",
-        "mnemonic": "",
+        "registry": "0xf48263bfc8237ae29480280083c63ba2c446eafa",
+        "mnemonic": "family dress industry stage bike shrimp replace design author amateur reopen script",
         "providerURL": "http:/127.0.0.1:7545"
     },
 
     "sepolia": {
         "net":"0xaa36a7",
-        "privKey1":"",
-        "privKey2":"",
+        "privKey1":"0xff2940ab746620d4d74162d4fb7a627eca7ce5ea497934d0fb3b2af2ce462439",
+        "privKey2":"0xb85a011ce30a885fa5aa10862a8ba1bc4e6cf40ded54fd173d1352a288ca5676",
         "privKey3": "",
         "privKey4": "",
         "privKey5": "",
@@ -23,27 +23,29 @@
     },
 
     "settings": {
-        "privKeyRAPath": "../src/RegAuthority/privKeyRA.key",
-        "pubKeyRAPath": "../src/RegAuthority/pubKeyRA.key"
+        "privKeyRAPath": "./src/RegAuthority/privKeyRA.key",
+        "pubKeyRAPath": "./src/RegAuthority/pubKeyRA.key"
     },
 
-    "server" : { 
+    "server" : {
         "ipAddrCRT": "127.0.0.1",
         "ipAddrSSI": "127.0.0.1",
         "portCRT": 5000,
         "portSSI": 5050,
-        "secretPath": "./secretServer/",
-        "domainsFile" : "../test/domains.txt",
+        "secretPath": "./src/secretServer/",
+        "domainsFile" : "./test/domains.txt",
         "validityIntVP": 172800000
     },
 
     "perfFiles" : {
-        "createVP" : "../perf/P2-DPKI-Sep.csv",
-        "verifyVP" : "../perf/P3-DPKI-Sep.csv",
+        "createZK" : "./perf3/Server-ZK-Local.csv",
+        "createVP" : "./perf3/P2-DPKI-Local.csv",
+        "verifyVP" : "./perf3/P3-DPKI-local.csv",
         "verifyCRT" : "",
-        "newEntryPerf": "../perf/TX-newEntry-Sep.csv",
-        "updEntryPerf": "../perf/TX-updEntry-Sep.csv",
-        "DIDresolutionPerf": "../perf/TX-resolve-Sep.csv",
-        "infoCTPerf": "../perf/TX-infoCT-Sep.csv"
+        "newEntryPerf": "./perf3/TX-newEntry-Local.csv",
+        "updEntryPerf": "./perf3/TX-updEntry-Local.csv",
+        "DIDresolutionPerf": "./perf3/TX-resolve-Local.csv",
+        "infoCTPerf": "./perf3/TX-infoCT-Local.csv",
+        "infoGETPROOFPerf": "./perf3/TX-GETPROOF-Local.csv"
     }
 }
